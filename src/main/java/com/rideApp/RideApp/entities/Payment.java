@@ -4,14 +4,17 @@ import java.time.LocalDateTime;
 
 import org.hibernate.annotations.CreationTimestamp;
 
-import com.rideApp.RideApp.entities.enums.TransactionMethod;
-import com.rideApp.RideApp.entities.enums.TransactionType;
+import com.rideApp.RideApp.entities.enums.PaymentMethod;
+import com.rideApp.RideApp.entities.enums.PaymentStatus;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -24,20 +27,23 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class WalletTransaction {
-
+public class Payment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Double amout;
-    private TransactionType transactionType;
-    private TransactionMethod transactionMethod;
-    @ManyToOne
+    @Enumerated(EnumType.STRING)
+    private PaymentMethod paymentMethod;
+
+    @OneToOne(fetch = FetchType.LAZY)
     private Ride ride;
-    @ManyToOne
-    private Wallet wallet;
+
+    private Double amount;
+
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
+
     @CreationTimestamp
-    private LocalDateTime timeStamp;
+    private LocalDateTime paymenTime;
 
 }

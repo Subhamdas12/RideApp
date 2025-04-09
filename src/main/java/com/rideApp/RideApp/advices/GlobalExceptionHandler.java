@@ -1,7 +1,11 @@
 package com.rideApp.RideApp.advices;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -22,7 +26,29 @@ public class GlobalExceptionHandler {
         return buildErrorResponseEntity(apiError);
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<?>> handleMethodArgumentNotValidException(
+            MethodArgumentNotValidException exception) {
+        List<String> errors = exception.getBindingResult().getAllErrors().stream().map(e -> e.getDefaultMessage())
+                .collect(Collectors.toList());
+        ApiError apiError = ApiError.builder().httpStatus(HttpStatus.BAD_REQUEST).message("Argument not valid")
+                .subErrors(errors).build();
+
+        return buildErrorResponseEntity(apiError);
+
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<?>> handleInternalServerError(Exception exception) {
+        ApiError apiError = ApiError.builder()
+                .httpStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                .message(exception.getMessage())
+                .build();
+        return buildErrorResponseEntity(apiError);
+    }
+
     public ResponseEntity<ApiResponse<?>> buildErrorResponseEntity(ApiError apiError) {
         return new ResponseEntity<>(new ApiResponse<>(apiError), apiError.getHttpStatus());
     }
+
 }

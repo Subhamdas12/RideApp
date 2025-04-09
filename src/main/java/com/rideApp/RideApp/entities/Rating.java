@@ -4,7 +4,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Index;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -14,18 +15,29 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Getter
-@Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "rider")
+@Getter
+@Setter
+@Table(name = "rating", indexes = {
+        @Index(name = "id_rating_rider", columnList = "rider_id"),
+        @Index(name = "id_rating_driver", columnList = "driver_id")
+})
 @Builder
-public class Rider {
+public class Rating {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @OneToOne
-    @JoinColumn(name = "user_id")
-    private User user;
-    private Double rating;
+    private Ride ride;
+
+    @ManyToOne
+    private Rider rider;
+
+    @ManyToOne
+    private Driver driver;
+
+    private Integer driverRating;
+    private Integer riderRating;
 }

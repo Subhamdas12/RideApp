@@ -2,7 +2,7 @@ package com.rideApp.RideApp.exceptions;
 
 public class RuntimeConflictException extends RuntimeException {
 
-    RuntimeConflictException(String message) {
+    public RuntimeConflictException(String message) {
         super(message);
     }
 

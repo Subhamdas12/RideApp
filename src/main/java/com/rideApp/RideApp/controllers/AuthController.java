@@ -17,10 +17,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-import java.net.http.HttpResponse;
+import java.util.Arrays;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationServiceException;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,18 +34,34 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/signup")
-    public ResponseEntity<UserDTO> signup(@RequestBody @Valid SignupDTO signupDTO) {
-        return new ResponseEntity<>(authService.signup(signupDTO), HttpStatus.CREATED);
+    public ResponseEntity<UserDTO> signup(@RequestBody @Valid SignupDTO signupDTO,
+            HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
+
+        LoginResponseDTO loginResponseDTO = authService.signup(signupDTO);
+        Cookie accessTokenCookie = new Cookie("access_token", loginResponseDTO.getAccessToken());
+        Cookie refreshTokencookie = new Cookie("refresh_token", loginResponseDTO.getRefreshToken());
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setPath("/");
+        refreshTokencookie.setHttpOnly(true);
+        refreshTokencookie.setPath("/");
+        httpServletResponse.addCookie(accessTokenCookie);
+        httpServletResponse.addCookie(refreshTokencookie);
+        return new ResponseEntity<>(loginResponseDTO.getUserDTO(), HttpStatus.CREATED);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid LoginRequestDTO loginRequestDTO,
+    public ResponseEntity<UserDTO> login(@RequestBody @Valid LoginRequestDTO loginRequestDTO,
             HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
-        String tokens[] = authService.login(loginRequestDTO);
-        Cookie cookie = new Cookie("token", tokens[1]);
-        cookie.setHttpOnly(true);
-        httpServletResponse.addCookie(cookie);
-        return ResponseEntity.ok(new LoginResponseDTO(tokens[0]));
+        LoginResponseDTO loginResponseDTO = authService.login(loginRequestDTO);
+        Cookie accessTokenCookie = new Cookie("access_token", loginResponseDTO.getAccessToken());
+        Cookie refreshTokencookie = new Cookie("refresh_token", loginResponseDTO.getRefreshToken());
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setPath("/");
+        refreshTokencookie.setHttpOnly(true);
+        refreshTokencookie.setPath("/");
+        httpServletResponse.addCookie(accessTokenCookie);
+        httpServletResponse.addCookie(refreshTokencookie);
+        return ResponseEntity.ok(loginResponseDTO.getUserDTO());
     }
 
     @PostMapping("/onBoardNewDriver/{userId}")
@@ -52,6 +69,57 @@ public class AuthController {
             @RequestBody OnBoardNewDriverDTO onBoardNewDriverDTO) {
         return new ResponseEntity<>(authService.onBoardNewDriver(userId,
                 onBoardNewDriverDTO), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<UserDTO> refreshAccessToken(HttpServletRequest httpServletRequest,
+            HttpServletResponse httpServletResponse) {
+
+        Cookie[] cookies = httpServletRequest.getCookies();
+        if (cookies == null) {
+            throw new AuthenticationServiceException("No cookies present in the request");
+        }
+        String refreshToken = Arrays.stream(cookies)
+                .filter(cookie -> "refresh_token".equals(cookie.getName())).findFirst().map(Cookie::getValue)
+                .orElseThrow(() -> new AuthenticationServiceException("Refresh token not found inside the Cookies"));
+
+        LoginResponseDTO loginResponseDTO = authService.refreshAccessToken(refreshToken);
+        Cookie accessTokenCookie = new Cookie("access_token", loginResponseDTO.getAccessToken());
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setPath("/");
+        httpServletResponse.addCookie(accessTokenCookie);
+
+        return ResponseEntity.ok(loginResponseDTO.getUserDTO());
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest httpServletRequest,
+            HttpServletResponse httpServletResponse) {
+        Cookie[] cookies = httpServletRequest.getCookies();
+        if (cookies == null) {
+            throw new AuthenticationServiceException("No cookies present in the request");
+        }
+        String refreshToken = Arrays.stream(cookies)
+                .filter(cookie -> "refresh_token".equals(cookie.getName())).findFirst().map(Cookie::getValue)
+                .orElseThrow(() -> new AuthenticationServiceException("Refresh token not found inside the Cookies"));
+
+        authService.logout(refreshToken);
+
+        Cookie accessTokenCookie = new Cookie("access_token", null);
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setPath("/");
+        accessTokenCookie.setMaxAge(0);
+
+        Cookie refreshTokenCookie = new Cookie("refresh_token", null);
+        refreshTokenCookie.setHttpOnly(true);
+        refreshTokenCookie.setPath("/");
+        refreshTokenCookie.setMaxAge(0);
+
+        httpServletResponse.addCookie(accessTokenCookie);
+        httpServletResponse.addCookie(refreshTokenCookie);
+
+        return ResponseEntity.ok().build();
+
     }
 
 }

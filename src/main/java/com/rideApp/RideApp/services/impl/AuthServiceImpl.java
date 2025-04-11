@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.rideApp.RideApp.DTO.DriverDTO;
 import com.rideApp.RideApp.DTO.LoginRequestDTO;
+import com.rideApp.RideApp.DTO.LoginResponseDTO;
 import com.rideApp.RideApp.DTO.OnBoardNewDriverDTO;
 import com.rideApp.RideApp.DTO.SignupDTO;
 import com.rideApp.RideApp.DTO.UserDTO;
@@ -21,11 +22,11 @@ import com.rideApp.RideApp.entities.enums.Role;
 import com.rideApp.RideApp.exceptions.ResourceNotFoundException;
 import com.rideApp.RideApp.exceptions.RuntimeConflictException;
 import com.rideApp.RideApp.repository.UserRepository;
-import com.rideApp.RideApp.repository.WalletRepository;
 import com.rideApp.RideApp.security.JwtService;
 import com.rideApp.RideApp.services.AuthService;
 import com.rideApp.RideApp.services.DriverService;
 import com.rideApp.RideApp.services.RiderService;
+import com.rideApp.RideApp.services.SessionService;
 import com.rideApp.RideApp.services.WalletService;
 
 import lombok.RequiredArgsConstructor;
@@ -42,10 +43,11 @@ public class AuthServiceImpl implements AuthService {
     private final RiderService riderService;
     private final WalletService walletService;
     private final DriverService driverService;
+    private final SessionService sessionService;
 
     @Override
     @Transactional
-    public UserDTO signup(SignupDTO signupDTO) {
+    public LoginResponseDTO signup(SignupDTO signupDTO) {
         User user = userRepository.findByEmail(signupDTO.getEmail()).orElse(null);
         if (user != null) {
             throw new RuntimeConflictException(
@@ -59,19 +61,24 @@ public class AuthServiceImpl implements AuthService {
         riderService.createNewRider(savedUser);
         walletService.createNewWallet(savedUser);
 
-        return modelMapper.map(savedUser, UserDTO.class);
+        String accessToken = jwtService.generateAccessToken(savedUser);
+        String refreshToken = jwtService.generateRefreshToken(savedUser);
+        sessionService.generateNewSession(savedUser, refreshToken);
+
+        return new LoginResponseDTO(accessToken, refreshToken, modelMapper.map(savedUser, UserDTO.class));
     }
 
     @Override
-    public String[] login(LoginRequestDTO loginRequestDTO) {
+    @Transactional
+    public LoginResponseDTO login(LoginRequestDTO loginRequestDTO) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequestDTO.getEmail(), loginRequestDTO.getPassword()));
         User user = (User) authentication.getPrincipal();
 
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
-
-        return new String[] { accessToken, refreshToken };
+        sessionService.generateNewSession(user, refreshToken);
+        return new LoginResponseDTO(accessToken, refreshToken, modelMapper.map(user, UserDTO.class));
     }
 
     @Override
@@ -95,6 +102,22 @@ public class AuthServiceImpl implements AuthService {
         Driver savedDriver = driverService.createNewDriver(createDriver);
         DriverDTO savedDriverDto = modelMapper.map(savedDriver, DriverDTO.class);
         return savedDriverDto;
+    }
+
+    @Override
+    @Transactional
+    public LoginResponseDTO refreshAccessToken(String refreshToken) {
+        Long userId = jwtService.getUserIdFromToken(refreshToken);
+        sessionService.validateSession(refreshToken);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id " + userId));
+        return new LoginResponseDTO(jwtService.generateAccessToken(user), refreshToken,
+                modelMapper.map(user, UserDTO.class));
+    }
+
+    @Override
+    public void logout(String refreshToken) {
+        sessionService.invalidateSession(refreshToken);
     }
 
 }

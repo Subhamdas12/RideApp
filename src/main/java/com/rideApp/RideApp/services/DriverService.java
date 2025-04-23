@@ -3,7 +3,9 @@ package com.rideApp.RideApp.services;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
+import com.rideApp.RideApp.DTO.DriverAvailibilityDTO;
 import com.rideApp.RideApp.DTO.DriverDTO;
+import com.rideApp.RideApp.DTO.DriverLocationDTO;
 import com.rideApp.RideApp.DTO.RatingDTO;
 import com.rideApp.RideApp.DTO.RideDTO;
 import com.rideApp.RideApp.DTO.RideStartDTO;
@@ -31,4 +33,8 @@ public interface DriverService {
     DriverDTO getMyProfile();
 
     Page<RideDTO> getAllMyRides(PageRequest pageRequest);
+
+    DriverDTO setDriverAvailibility(DriverAvailibilityDTO driverAvailibilityDTO);
+
+    DriverDTO setDriverLocation(DriverLocationDTO driverLocationDTO);
 }

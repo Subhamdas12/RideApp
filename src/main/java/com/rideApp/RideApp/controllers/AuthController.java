@@ -55,8 +55,10 @@ public class AuthController {
         LoginResponseDTO loginResponseDTO = authService.login(loginRequestDTO);
         Cookie accessTokenCookie = new Cookie("access_token", loginResponseDTO.getAccessToken());
         Cookie refreshTokencookie = new Cookie("refresh_token", loginResponseDTO.getRefreshToken());
+        accessTokenCookie.setMaxAge(10 * 60);
         accessTokenCookie.setHttpOnly(true);
         accessTokenCookie.setPath("/");
+        refreshTokencookie.setMaxAge(6 * 30 * 24 * 60 * 60);
         refreshTokencookie.setHttpOnly(true);
         refreshTokencookie.setPath("/");
         httpServletResponse.addCookie(accessTokenCookie);
@@ -85,6 +87,7 @@ public class AuthController {
 
         LoginResponseDTO loginResponseDTO = authService.refreshAccessToken(refreshToken);
         Cookie accessTokenCookie = new Cookie("access_token", loginResponseDTO.getAccessToken());
+        accessTokenCookie.setMaxAge(10 * 60);
         accessTokenCookie.setHttpOnly(true);
         accessTokenCookie.setPath("/");
         httpServletResponse.addCookie(accessTokenCookie);

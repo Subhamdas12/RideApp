@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.rideApp.RideApp.DTO.DriverAvailibilityDTO;
 import com.rideApp.RideApp.DTO.DriverDTO;
 import com.rideApp.RideApp.DTO.RatingDTO;
 import com.rideApp.RideApp.DTO.RideDTO;
@@ -64,6 +65,11 @@ public class DriverController {
         PageRequest pageRequest = PageRequest.of(pageOffset, pageSize,
                 Sort.by(Sort.Direction.DESC, "createdTime", "id"));
         return ResponseEntity.ok(driverService.getAllMyRides(pageRequest));
+    }
+
+    @PostMapping("/setDriverAvailibility")
+    public ResponseEntity<DriverDTO> setDriverAvailibility(@RequestBody DriverAvailibilityDTO driverAvailibilityDTO) {
+        return ResponseEntity.ok(driverService.setDriverAvailibility(driverAvailibilityDTO));
     }
 
 }

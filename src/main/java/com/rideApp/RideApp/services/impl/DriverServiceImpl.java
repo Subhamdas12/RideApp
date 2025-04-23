@@ -2,14 +2,19 @@ package com.rideApp.RideApp.services.impl;
 
 import java.time.LocalDateTime;
 
+import org.locationtech.jts.geom.Point;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.rideApp.RideApp.DTO.DriverAvailibilityDTO;
 import com.rideApp.RideApp.DTO.DriverDTO;
+import com.rideApp.RideApp.DTO.DriverLocationDTO;
+import com.rideApp.RideApp.DTO.PointDTO;
 import com.rideApp.RideApp.DTO.RatingDTO;
 import com.rideApp.RideApp.DTO.RideDTO;
 import com.rideApp.RideApp.DTO.RideStartDTO;
@@ -17,6 +22,7 @@ import com.rideApp.RideApp.DTO.RiderDTO;
 import com.rideApp.RideApp.entities.Driver;
 import com.rideApp.RideApp.entities.Ride;
 import com.rideApp.RideApp.entities.RideRequest;
+import com.rideApp.RideApp.entities.Rider;
 import com.rideApp.RideApp.entities.User;
 import com.rideApp.RideApp.entities.enums.RideRequestStatus;
 import com.rideApp.RideApp.entities.enums.RideStatus;
@@ -28,6 +34,7 @@ import com.rideApp.RideApp.services.PaymentService;
 import com.rideApp.RideApp.services.RatingService;
 import com.rideApp.RideApp.services.RideRequestService;
 import com.rideApp.RideApp.services.RideService;
+import com.rideApp.RideApp.services.UserService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -41,6 +48,8 @@ public class DriverServiceImpl implements DriverService {
     private final RideService rideService;
     private final PaymentService paymentService;
     private final RatingService ratingService;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final UserService userService;
 
     @Override
     @Transactional
@@ -57,7 +66,10 @@ public class DriverServiceImpl implements DriverService {
         }
         Driver savedDriver = updateDriverAvailibility(currentDriver, false);
         Ride ride = rideService.createNewRide(rideRequest, savedDriver);
-        return modelMapper.map(ride, RideDTO.class);
+        RideDTO rideDTO = modelMapper.map(ride, RideDTO.class);
+        User riderUser = rideRequest.getRider().getUser();
+        messagingTemplate.convertAndSend("/topic/rider/rideAccepted/" + riderUser.getId(), rideDTO);
+        return rideDTO;
 
     }
 
@@ -101,8 +113,10 @@ public class DriverServiceImpl implements DriverService {
 
         paymentService.createNewPayment(savedRide);
         ratingService.createNewRating(savedRide);
-
-        return modelMapper.map(savedRide, RideDTO.class);
+        RideDTO rideDTO = modelMapper.map(savedRide, RideDTO.class);
+        User riderUser = ride.getRider().getUser();
+        messagingTemplate.convertAndSend("/topic/rider/rideStart/" + riderUser.getId(), rideDTO);
+        return rideDTO;
 
     }
 
@@ -123,8 +137,10 @@ public class DriverServiceImpl implements DriverService {
 
         updateDriverAvailibility(driver, true);
         paymentService.processPayment(ride);
-
-        return modelMapper.map(savedRide, RideDTO.class);
+        User riderUser = ride.getRider().getUser();
+        RideDTO rideDTO = modelMapper.map(savedRide, RideDTO.class);
+        messagingTemplate.convertAndSend("/topic/rider/rideEnd/" + riderUser.getId(), rideDTO);
+        return rideDTO;
     }
 
     @Override
@@ -141,7 +157,10 @@ public class DriverServiceImpl implements DriverService {
 
         Ride savedRide = rideService.updateRideStatus(ride, RideStatus.CANCELLED);
         updateDriverAvailibility(driver, true);
-        return modelMapper.map(savedRide, RideDTO.class);
+        RideDTO rideDTO = modelMapper.map(savedRide, RideDTO.class);
+        User riderUser = ride.getRider().getUser();
+        messagingTemplate.convertAndSend("/topic/rider/rideCancel/" + riderUser.getId(), rideDTO);
+        return rideDTO;
     }
 
     @Override
@@ -171,6 +190,26 @@ public class DriverServiceImpl implements DriverService {
         Driver currentDriver = getCurrentDriver();
         Page<Ride> ridePage = rideService.getAllRideOfDriver(currentDriver, pageRequest);
         return ridePage.map(ride -> modelMapper.map(ride, RideDTO.class));
+    }
+
+    @Override
+    public DriverDTO setDriverAvailibility(DriverAvailibilityDTO driverAvailibilityDTO) {
+        boolean isAvailable = driverAvailibilityDTO.getIsAvailable();
+        Driver currentDriver = getCurrentDriver();
+        return modelMapper.map(updateDriverAvailibility(currentDriver, isAvailable), DriverDTO.class);
+    }
+
+    @Override
+    public DriverDTO setDriverLocation(DriverLocationDTO driverLocationDTO) {
+        User currentUser = userService.getUserById(driverLocationDTO.getUserId());
+        Driver driver = driverRepository.findByUser(currentUser)
+                .orElseThrow(() -> new ResourceNotFoundException("No driver found with userId " + currentUser.getId()));
+        PointDTO pointDTO = new PointDTO(driverLocationDTO.getCoordinates());
+        Point point = modelMapper.map(pointDTO, Point.class);
+        driver.setCurrentLocation(point);
+        Driver savedDriver = driverRepository.save(driver);
+        return modelMapper.map(savedDriver, DriverDTO.class);
+
     }
 
 }

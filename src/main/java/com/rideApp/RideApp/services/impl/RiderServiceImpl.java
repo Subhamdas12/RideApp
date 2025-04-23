@@ -6,8 +6,10 @@ import java.util.Set;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.rideApp.RideApp.DTO.DriverDTO;
 import com.rideApp.RideApp.DTO.RatingDTO;
@@ -45,8 +47,10 @@ public class RiderServiceImpl implements RiderService {
     private final RideService rideService;
     private final DriverService driverService;
     private final RatingService ratingService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Override
+    @Transactional
     public RideRequestDTO requestRide(RideRequestDTO rideRequestDTO) {
         Rider rider = getCurrentRider();
         RideRequest rideRequest = modelMapper.map(rideRequestDTO, RideRequest.class);
@@ -60,7 +64,14 @@ public class RiderServiceImpl implements RiderService {
         List<Driver> drivers = rideStrategyManager.driverMatchingStrategy(rider.getRating())
                 .findMatchingDriver(savedRideRequest);
 
-        return modelMapper.map(savedRideRequest, RideRequestDTO.class);
+        RideRequestDTO mappedRideRequestDTO = modelMapper.map(savedRideRequest, RideRequestDTO.class);
+
+        for (Driver driver : drivers) {
+            User driverUser = driver.getUser();
+            messagingTemplate.convertAndSend("/topic/driver/requestRide/" + driverUser.getId(), mappedRideRequestDTO);
+        }
+
+        return mappedRideRequestDTO;
     }
 
     private Rider getCurrentRider() {
@@ -119,6 +130,13 @@ public class RiderServiceImpl implements RiderService {
         Rider currentRider = getCurrentRider();
         Page<Ride> ridePage = rideService.getAllRideOfRider(currentRider, pageRequest);
         return ridePage.map(ride -> modelMapper.map(ride, RideDTO.class));
+
+    }
+
+    @Override
+    public Double getPricing(RideRequestDTO rideRequestDTO) {
+        RideRequest rideRequest = modelMapper.map(rideRequestDTO, RideRequest.class);
+        return rideStrategyManager.rideFareCalculationStrategy().calculateFare(rideRequest);
 
     }
 

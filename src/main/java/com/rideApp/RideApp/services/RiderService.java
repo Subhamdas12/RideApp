@@ -26,4 +26,6 @@ public interface RiderService {
 
     Page<RideDTO> getAllMyRides(PageRequest pageRequest);
 
+    Double getPricing(RideRequestDTO rideRequestDTO);
+
 }

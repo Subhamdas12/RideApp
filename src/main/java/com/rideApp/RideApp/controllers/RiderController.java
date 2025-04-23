@@ -49,6 +49,11 @@ public class RiderController {
         return ResponseEntity.ok(riderService.getMyProfile());
     }
 
+    @PostMapping("/getPricing")
+    public ResponseEntity<Double> getPricing(@RequestBody RideRequestDTO rideRequestDTO) {
+        return ResponseEntity.ok(riderService.getPricing(rideRequestDTO));
+    }
+
     @GetMapping("/getMyRides")
     public ResponseEntity<Page<RideDTO>> getAllMyRides(@RequestParam(defaultValue = "0") Integer pageOffset,
             @RequestParam(defaultValue = "10", required = false) Integer pageSize) {
